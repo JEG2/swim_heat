@@ -1,13 +1,12 @@
-defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
+defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
   alias SwimHeat.Parser.State
   alias SwimHeat.Parser.State.Meet
   alias SwimHeat.Parser.State.Swim
 
   @place_pattern "\\d+|-+"
   @name_pattern "\\S.*?"
-  @year_pattern "FR|SO|JR|SR|\\d+"
+  @year_pattern "FR|SO|JR|SR"
   @time_pattern "(?:\\d+:)?\\d+\\.\\d+"
-  @points_pattern "\\d+"
 
   def parse_individual_headers(state, line) do
     with parsed when is_map(parsed) <-
@@ -15,11 +14,9 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
              ~r{
                \A\s*
                Name\s+
-               (?:Yr|Age)\s+
-               School\s+
-               Seed(?:\sTime)?\s+
-               Finals(?:\sTime)?\s+
-               Points\s*
+               Yr\s+
+               Team\s+
+               Finals\sTime\s*
                \z
              }x,
              line
@@ -33,20 +30,16 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
            Regex.named_captures(
              ~r/
                \A\s*
-               (?<place>#{@place_pattern})\s+
+               \*?(?<place>#{@place_pattern})\s+
                (?<name>#{@name_pattern})\s{2,}
                (?:(?<year>#{@year_pattern})\s+)?
                (?<school>#{@name_pattern})\s+
-               (?<seed>#{@time_pattern}|NT)\s+
                (?<time>[xX]?(?:#{@time_pattern}|NS|DQ))\s*
-               (?<points>#{@points_pattern})?\s*
                \z
              /x,
              line
            ) do
       add_swim(state, parsed)
-    else
-      nil -> parse_splits(state, line)
     end
   end
 
@@ -55,11 +48,9 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
            Regex.named_captures(
              ~r{
                \A\s*
-               (?:Team|School)\s+
-               (?:Relay\s+)?
-               Seed(?:\sTime)?\s+
-               Finals(?:\sTime)?\s+
-               Points\s*
+               Team\s+
+               Relay\s+
+               Finals\sTime\s*
                \z
              }x,
              line
@@ -73,12 +64,10 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
            Regex.named_captures(
              ~r/
                \A\s*
-               (?<place>#{@place_pattern})\s+
+               \*?(?<place>#{@place_pattern})\s+
                (?<school>#{@name_pattern})\s+
                '?(?<relay>[A-E])'?\s+
-               (?<seed>#{@time_pattern}|NT)\s+
                (?<time>[xX]?(?:#{@time_pattern}|NS|DQ))\s*
-               (?<points>#{@points_pattern})?\s*
                \z
              /x,
              line
@@ -92,7 +81,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
   def parse_swimmers(state, line) do
     with matches when matches != [] <-
            Regex.scan(
-             ~r/[1-4]\)\s+(\S\D*?)\s+(#{@year_pattern})?(?=\s+[1-4]\)|\s*\z)/,
+             ~r/(\S.*?)\s(#{@year_pattern})?(?:\s{2,}|\s*\z)/,
              line,
              capture: :all_but_first
            ) do
@@ -115,27 +104,6 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                   fn [result | rest] ->
                     swimmers = result.swimmers ++ swimmers
                     [%Swim{result | swimmers: swimmers} | rest]
-                  end
-                )
-          }
-      }
-    else
-      [] -> parse_splits(state, line)
-    end
-  end
-
-  def parse_splits(state, line) do
-    if String.match?(line, ~r/\A(?:\s+(?:#{@time_pattern}|DQ))+\s*\z/) do
-      %State{
-        state
-        | meet: %Meet{
-            state.meet
-            | events:
-                Map.update!(
-                  state.meet.events,
-                  state.event,
-                  fn [swim | rest] ->
-                    [Swim.add_splits(swim, line) | rest]
                   end
                 )
           }

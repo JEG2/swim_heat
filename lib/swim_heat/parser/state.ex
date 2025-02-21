@@ -1,3 +1,10 @@
 defmodule SwimHeat.Parser.State do
-  defstruct ~w[reading strategy meet event fragment]a
+  defstruct page: 0,
+            reading: nil,
+            strategy: nil,
+            meet: nil,
+            event: nil,
+            columns: nil,
+            buffer: %{},
+            fragment: nil
 end

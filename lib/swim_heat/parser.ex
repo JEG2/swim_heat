@@ -3,6 +3,7 @@ defmodule SwimHeat.Parser do
   alias SwimHeat.Parser.State.Event
   alias SwimHeat.Parser.State.Meet
   alias SwimHeat.Parser.Strategy.OneEventAtATime
+  alias SwimHeat.Parser.Strategy.MultipleEventsInColumns
   alias SwimHeat.PrivFiles
 
   @event_re ~r{
@@ -25,10 +26,14 @@ defmodule SwimHeat.Parser do
   end
 
   def parse_meet(file) do
+    file
+    |> File.stream!()
+    |> process_stream(file)
+  end
+
+  defp process_stream(enum, file, state \\ %State{}) do
     result =
-      file
-      |> File.stream!()
-      |> Enum.reduce_while(%State{}, fn line, state ->
+      Enum.reduce_while(enum, state, fn line, state ->
         try do
           case parse_line(state, line) do
             %State{reading: :done} = s -> {:halt, s}
@@ -42,8 +47,21 @@ defmodule SwimHeat.Parser do
       end)
 
     case result do
-      state when is_struct(state, State) -> post_process(state.meet)
-      error -> error
+      state when is_struct(state, State) ->
+        if is_map(state.buffer) and map_size(state.buffer) > 0 do
+          state.buffer
+          |> Enum.sort()
+          |> Enum.flat_map(fn {_i, lines} -> Enum.reverse(lines) end)
+          |> process_stream(
+            file,
+            %State{state | columns: nil, buffer: nil, reading: :event}
+          )
+        else
+          post_process(state.meet)
+        end
+
+      error ->
+        error
     end
   end
 
@@ -52,27 +70,40 @@ defmodule SwimHeat.Parser do
       is_binary(state.fragment) ->
         with merged when is_binary(merged) <-
                merge_lines(state.fragment, line) do
-          parse_line(%State{state | fragment: nil}, line)
+          parse_line(%State{state | fragment: nil}, merged)
         end
 
       finished?(line) ->
         %State{state | reading: :done}
 
       page_start?(line) ->
-        %State{state | reading: :meet_name_and_date}
+        %State{state | page: state.page + 1, reading: :meet_name_and_date}
 
       junk_line?(line) ->
         state
 
+      state.reading in ~w[meet_name_and_date strategy]a ->
+        apply(__MODULE__, :"parse_#{state.reading}", [state, line])
+
+      is_list(state.columns) and is_map(state.buffer) ->
+        buffer =
+          state.columns
+          |> Enum.with_index()
+          |> Enum.reduce(state.buffer, fn {range, i}, acc ->
+            column = String.slice(line, range)
+            j = state.page * length(state.columns) + i
+            Map.update(acc, j, [column], &[column | &1])
+          end)
+
+        %State{state | buffer: buffer}
+
       new_event?(state, line) ->
         parse_event(%State{state | reading: :event}, line)
 
-      :functions
-      |> __MODULE__.__info__()
-      |> Keyword.has_key?(:"parse_#{state.reading}") ->
-        apply(__MODULE__, :"parse_#{state.reading}", [state, line])
+      state.reading == :event ->
+        parse_event(state, line)
 
-      is_atom(state.strategy) ->
+      not is_nil(state.strategy) ->
         case apply(state.strategy, :"parse_#{state.reading}", [state, line]) do
           %State{} = s ->
             s
@@ -124,6 +155,16 @@ defmodule SwimHeat.Parser do
 
   def parse_strategy(%State{strategy: nil} = state, line) do
     cond do
+      String.starts_with?(line, "#") ->
+        parse_event(
+          %State{
+            state
+            | reading: :event,
+              strategy: MultipleEventsInColumns
+          },
+          line
+        )
+
       true ->
         parse_event(
           %State{
@@ -134,6 +175,22 @@ defmodule SwimHeat.Parser do
           line
         )
     end
+  end
+
+  def parse_event(%State{columns: nil} = state, "#" <> _rest = line) do
+    columns =
+      ~r{#[^#]+}
+      |> Regex.scan(line)
+      |> List.flatten()
+      |> Enum.map_reduce(0, fn column, acc ->
+        l = acc + String.length(column)
+        {acc..(l - 1)//1, l}
+      end)
+      |> then(fn {ranges, _acc} ->
+        List.replace_at(ranges, -1, Enum.at(ranges, -1).first..-1//1)
+      end)
+
+    parse_line(%State{state | columns: columns}, line)
   end
 
   def parse_event(state, "(" <> line) do

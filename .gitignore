@@ -25,5 +25,5 @@ swim_heat-*.tar
 # Downloaded and processed data.
 /priv/meet_results/
 
-# macOS specific files
+# macOS specific files.
 **/.DS_Store

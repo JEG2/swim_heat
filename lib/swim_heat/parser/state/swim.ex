@@ -20,7 +20,8 @@ defmodule SwimHeat.Parser.State.Swim do
 
     points =
       case fields["points"] do
-        "" -> 0
+        nil -> nil
+        "" -> nil
         n -> String.to_integer(n)
       end
 
@@ -44,6 +45,8 @@ defmodule SwimHeat.Parser.State.Swim do
 
     %__MODULE__{swim | splits: swim.splits ++ splits}
   end
+
+  defp parse_time(nil), do: nil
 
   defp parse_time(time) do
     time = String.replace(time, ~r{\A[xX]}, "")

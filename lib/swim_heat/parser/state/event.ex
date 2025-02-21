@@ -23,9 +23,13 @@ defmodule SwimHeat.Parser.State.Event do
     stroke =
       case fields["stroke"] do
         "Freestyle" -> :free
+        "Free" -> :free
         "Breaststroke" -> :breast
+        "Breast" -> :breast
         "Butterfly" -> :fly
+        "Fly" -> :fly
         "Backstroke" -> :back
+        "Back" -> :back
         "IM" -> :im
         "Medley" -> :medley
       end
