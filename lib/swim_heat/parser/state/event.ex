@@ -11,7 +11,9 @@ defmodule SwimHeat.Parser.State.Event do
     gender =
       case fields["gender"] do
         "Girls" -> :girls
+        "Women" -> :girls
         "Boys" -> :boys
+        "Men" -> :boys
       end
 
     unit =

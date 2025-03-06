@@ -16,10 +16,10 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                \A\s*
                Name\s+
                (?:Yr|Age)\s+
-               School\s+
+               (?:School|Team)\s+
                Seed(?:\sTime)?\s+
-               Finals(?:\sTime)?\s+
-               Points\s*
+               Finals(?:\sTime)?\s*
+               (?:Points)?\s*
                \z
              }x,
              line
@@ -33,12 +33,12 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
            Regex.named_captures(
              ~r/
                \A\s*
-               (?<place>#{@place_pattern})\s+
+               \*?(?<place>#{@place_pattern})\s+
                (?<name>#{@name_pattern})\s{2,}
                (?:(?<year>#{@year_pattern})\s+)?
                (?<school>#{@name_pattern})\s+
                (?<seed>#{@time_pattern}|NT)\s+
-               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ))\s*
+               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,
@@ -58,8 +58,8 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                (?:Team|School)\s+
                (?:Relay\s+)?
                Seed(?:\sTime)?\s+
-               Finals(?:\sTime)?\s+
-               Points\s*
+               Finals(?:\sTime)?\s*
+               (?:Points)?\s*
                \z
              }x,
              line
@@ -73,11 +73,11 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
            Regex.named_captures(
              ~r/
                \A\s*
-               (?<place>#{@place_pattern})\s+
+               \*?(?<place>#{@place_pattern})\s+
                (?<school>#{@name_pattern})\s+
                '?(?<relay>[A-E])'?\s+
                (?<seed>#{@time_pattern}|NT)\s+
-               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ))\s*
+               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,
@@ -125,7 +125,10 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
   end
 
   def parse_splits(state, line) do
-    if String.match?(line, ~r/\A(?:\s+(?:#{@time_pattern}|DQ))+\s*\z/) do
+    if String.match?(
+         line,
+         ~r/\A(?:\s+(?:#{@time_pattern}Q?(?:\s+\([^\)]*\))?|DQ))+\s*\z/x
+       ) do
       %State{
         state
         | meet: %Meet{

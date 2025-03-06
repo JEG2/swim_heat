@@ -40,7 +40,9 @@ defmodule SwimHeat.Parser.State.Swim do
     splits =
       splits
       |> String.trim()
+      |> String.replace(~r{\(\s+\)}, "()")
       |> String.split()
+      |> Enum.reject(fn t -> String.starts_with?(t, "(") end)
       |> Enum.map(&parse_time/1)
 
     %__MODULE__{swim | splits: swim.splits ++ splits}
@@ -49,10 +51,13 @@ defmodule SwimHeat.Parser.State.Swim do
   defp parse_time(nil), do: nil
 
   defp parse_time(time) do
-    time = String.replace(time, ~r{\A[xX]}, "")
+    time =
+      time
+      |> String.replace(~r{\A[xX]}, "")
+      |> String.replace(~r{(\d)Q\z}, "\\1")
 
     cond do
-      time in ~w[NT NS DQ] ->
+      String.starts_with?(time, "DQ") or time in ~w[NT NS SCR DNF] ->
         nil
 
       String.contains?(time, ":") ->

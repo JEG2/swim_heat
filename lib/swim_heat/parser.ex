@@ -10,13 +10,19 @@ defmodule SwimHeat.Parser do
     \A\s*
     \(?
     (?:(?:Event\s+|\#)(?<number>\d+)\s+)?
-    (?<gender>Girls|Boys)\s+
+    (?<gender>Girls|Boys|Women|Men)\s+
     (?<distance>\d+)\s+
     (?:SC\s+)?(?<unit>Yard|Meter)\s+
-    (?<stroke>\S+?)\s*
+    (?<stroke>
+      Free(?:style)?|
+      (?:Back|Breast)(?:stroke)?|
+      Butterfly|
+      Fly|
+      IM|
+      Medley
+    )\s*
     (?<relay>Relay)?
     \)?\s*
-    \z
   }x
 
   def stream_meets do
@@ -28,6 +34,7 @@ defmodule SwimHeat.Parser do
   def parse_meet(file) do
     file
     |> File.stream!()
+    |> Stream.map(fn line -> String.replace(line, "Butter ly", "Butterfly") end)
     |> process_stream(file)
   end
 
@@ -214,7 +221,7 @@ defmodule SwimHeat.Parser do
   end
 
   defp finished?(line) do
-    String.match?(line, ~r{\s+Team\s+Rankings\s+})
+    String.match?(line, ~r{\s+(?:Team|Meet)\s+(?:Rankings|Scores)\s+})
   end
 
   defp page_start?(line) do
@@ -225,7 +232,13 @@ defmodule SwimHeat.Parser do
     String.match?(line, ~r{\A[\s=]*\z}) or
       String.match?(line, ~r{\AFirefox\b}) or
       String.match?(line, ~r{\A\d+\s+of\s+\d+\b}) or
-      String.match?(line, ~r{\A\s+Results\b})
+      String.match?(line, ~r{\A\s+Results\b}) or
+      String.match?(line, ~r{\A\s+Early\s+take-off\b}) or
+      String.match?(line, ~r{\A\s+False\s+start\b}) or
+      String.match?(line, ~r{\A\s+Shoulders\b}) or
+      String.match?(line, ~r{\A\s+Did\s+not\s+finish\b}) or
+      String.match?(line, ~r{\A\s+Delay\s+of\s+meet\b}) or
+      String.match?(line, ~r{\A\s+Not\s+on\s+back\b})
   end
 
   defp new_event?(state, line) do

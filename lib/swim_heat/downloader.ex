@@ -4,6 +4,7 @@ defmodule SwimHeat.Downloader do
   @base_url "https://ossaaillustrated.com/swimming/"
   @meets_header "2024-25 SWIM MEET RESULTS"
   @regionals_date "2025-02-08"
+  @state_date "2025-02-24"
   @months ~w[January February March
              April May June
              July August September
@@ -69,7 +70,18 @@ defmodule SwimHeat.Downloader do
         {parsed["url"], "#{@regionals_date}_#{PrivFiles.clean_name(name)}.pdf"}
       end)
 
-    season ++ regionals
+    state =
+      listing
+      |> Enum.filter(fn line ->
+        String.match?(line, ~r{6A\s+State\s+Finals\s+Results})
+      end)
+      |> Enum.map(fn line ->
+        parsed = parse_download_link(line)
+        name = String.replace(parsed["name"], ~r{\A\d+}, "")
+        {parsed["url"], "#{@state_date}_#{PrivFiles.clean_name(name)}.pdf"}
+      end)
+
+    season ++ regionals ++ state
   end
 
   defp parse_download_link(line) do
