@@ -6,13 +6,12 @@ defmodule SwimHeat.Parser do
   alias SwimHeat.Parser.Strategy.MultipleEventsInColumns
   alias SwimHeat.PrivFiles
 
-  @event_re ~r{
-    \A\s*
-    \(?
-    (?:(?:Event\s+|\#)(?<number>\d+)\s+)?
-    (?<gender>Girls|Boys|Women|Men)\s+
-    (?<distance>\d+)\s+
-    (?:SC\s+)?(?<unit>Yard|Meter)\s+
+  @event_pattern """
+    (?:(?:(?:[AB]\\s+-\\s+Final|Preliminaries)\\s+\\.\\.\\.\\s+)?\\()?
+    (?:(?:Event\\s+|\\#)(?<number>\\d+)\\s+)?
+    (?<gender>Girls|Boys|Women|Men)\\s+
+    (?<distance>\\d+)\\s+
+    (?:SC\\s+)?(?<unit>Yard|Meter)\\s+
     (?<stroke>
       Free(?:style)?|
       (?:Back|Breast)(?:stroke)?|
@@ -20,10 +19,11 @@ defmodule SwimHeat.Parser do
       Fly|
       IM|
       Medley
-    )\s*
+    )\\s*
     (?<relay>Relay)?
-    \)?\s*
-  }x
+    \\)?
+  """
+  @event_re ~r{\A\s*#{@event_pattern}\s*}x
 
   def stream_meets do
     Stream.map(PrivFiles.all_txts(), fn file ->
@@ -32,13 +32,53 @@ defmodule SwimHeat.Parser do
   end
 
   def parse_meet(file) do
-    file
-    |> File.stream!()
-    |> Stream.map(fn line -> String.replace(line, "Butter ly", "Butterfly") end)
-    |> process_stream(file)
+    lines =
+      file
+      |> File.stream!()
+      |> Stream.map(&String.replace(&1, "Butter ly", "Butterfly"))
+
+    state = choose_strategy(lines)
+    process_stream(lines, file, state)
   end
 
-  defp process_stream(enum, file, state \\ %State{}) do
+  def choose_strategy(enum) do
+    columns =
+      Enum.reduce(enum, MapSet.new(), fn line, acc ->
+        Regex.scan(
+          ~r{#{@event_pattern}}x,
+          line,
+          return: :index,
+          capture: :first
+        )
+        |> Enum.reduce(acc, fn [{i, _len}], acc ->
+          MapSet.put(acc, i)
+        end)
+      end)
+      |> Enum.sort()
+      |> Enum.reduce([0], fn i, [prev | _rest] = acc ->
+        if i - prev > 10 do
+          [i | acc]
+        else
+          acc
+        end
+      end)
+      |> Enum.reverse()
+
+    case columns do
+      [0] ->
+        %State{strategy: OneEventAtATime}
+
+      starts ->
+        ranges =
+          (starts ++ [0])
+          |> Enum.chunk_every(2, 1, :discard)
+          |> Enum.map(fn [i, len] -> i..(len - 1)//1 end)
+
+        %State{strategy: MultipleEventsInColumns, columns: ranges}
+    end
+  end
+
+  defp process_stream(enum, file, state) do
     result =
       Enum.reduce_while(enum, state, fn line, state ->
         try do
@@ -61,7 +101,7 @@ defmodule SwimHeat.Parser do
           |> Enum.flat_map(fn {_i, lines} -> Enum.reverse(lines) end)
           |> process_stream(
             file,
-            %State{state | columns: nil, buffer: nil, reading: :event}
+            %State{state | columns: [0..-1//1], buffer: nil, reading: :event}
           )
         else
           post_process(state.meet)
@@ -80,7 +120,7 @@ defmodule SwimHeat.Parser do
           parse_line(%State{state | fragment: nil}, merged)
         end
 
-      finished?(line) ->
+      finished?(line) and not buffering?(state) ->
         %State{state | reading: :done}
 
       page_start?(line) ->
@@ -92,17 +132,8 @@ defmodule SwimHeat.Parser do
       state.reading in ~w[meet_name_and_date strategy]a ->
         apply(__MODULE__, :"parse_#{state.reading}", [state, line])
 
-      is_list(state.columns) and is_map(state.buffer) ->
-        buffer =
-          state.columns
-          |> Enum.with_index()
-          |> Enum.reduce(state.buffer, fn {range, i}, acc ->
-            column = String.slice(line, range)
-            j = state.page * length(state.columns) + i
-            Map.update(acc, j, [column], &[column | &1])
-          end)
-
-        %State{state | buffer: buffer}
+      buffering?(state) ->
+        %State{state | buffer: extract_columns(state, line)}
 
       new_event?(state, line) ->
         parse_event(%State{state | reading: :event}, line)
@@ -125,6 +156,31 @@ defmodule SwimHeat.Parser do
     end
   end
 
+  def extract_columns(state, line) do
+    state.columns
+    |> Enum.map(fn range -> String.slice(line, range) end)
+    |> fix_columns()
+    |> Enum.with_index()
+    |> Enum.reduce(state.buffer, fn {column, i}, acc ->
+      j = state.page * length(state.columns) + i
+      Map.update(acc, j, [column], &[column | &1])
+    end)
+  end
+
+  def fix_columns([one, two, three]) do
+    [one, two] = fix_columns([one, two])
+    [two, three] = fix_columns([two, three])
+    [one, two, three]
+  end
+
+  def fix_columns([one, two]) do
+    if two == "" or String.slice(one, -2, 2) == "  " do
+      [one, two]
+    else
+      fix_columns([one <> String.first(two), String.slice(two, 1..-1//1)])
+    end
+  end
+
   def parse_meet_name_and_date(%State{meet: nil} = state, line) do
     with parsed when is_map(parsed) <-
            Regex.named_captures(
@@ -137,7 +193,7 @@ defmodule SwimHeat.Parser do
              }x,
              line
            ) do
-      %State{state | reading: :strategy, meet: Meet.new(parsed)}
+      %State{state | reading: :event, meet: Meet.new(parsed)}
     end
   end
 
@@ -158,46 +214,6 @@ defmodule SwimHeat.Parser do
     else
       {:error, "non-matching date"}
     end
-  end
-
-  def parse_strategy(%State{strategy: nil} = state, line) do
-    cond do
-      String.starts_with?(line, "#") ->
-        parse_event(
-          %State{
-            state
-            | reading: :event,
-              strategy: MultipleEventsInColumns
-          },
-          line
-        )
-
-      true ->
-        parse_event(
-          %State{
-            state
-            | reading: :event,
-              strategy: OneEventAtATime
-          },
-          line
-        )
-    end
-  end
-
-  def parse_event(%State{columns: nil} = state, "#" <> _rest = line) do
-    columns =
-      ~r{#[^#]+}
-      |> Regex.scan(line)
-      |> List.flatten()
-      |> Enum.map_reduce(0, fn column, acc ->
-        l = acc + String.length(column)
-        {acc..(l - 1)//1, l}
-      end)
-      |> then(fn {ranges, _acc} ->
-        List.replace_at(ranges, -1, Enum.at(ranges, -1).first..-1//1)
-      end)
-
-    parse_line(%State{state | columns: columns}, line)
   end
 
   def parse_event(state, "(" <> line) do
@@ -222,6 +238,10 @@ defmodule SwimHeat.Parser do
 
   defp finished?(line) do
     String.match?(line, ~r{\s+(?:Team|Meet)\s+(?:Rankings|Scores)\s+})
+  end
+
+  defp buffering?(state) do
+    is_list(state.columns) and is_map(state.buffer)
   end
 
   defp page_start?(line) do
