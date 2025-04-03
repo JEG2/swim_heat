@@ -7,7 +7,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
   @name_pattern "\\S.*?"
   @year_pattern "FR|SO|JR|SR"
   @time_pattern "(?:\\d+:)?\\d+\\.\\d+"
-  @points_pattern "\\d+"
+  @points_pattern "\\d+(?:\\.0)?"
 
   def parse_individual_headers(state, line) do
     with parsed when is_map(parsed) <-
@@ -15,7 +15,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
              ~r{
                \A\s*
                Name\s+
-               (?:Yr|Age)\s*
+               (?:Yr|Age)?\s*
                (?:Team|School)\s+
                Finals\sTime\s*
                \z
@@ -35,13 +35,15 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
                (?<name>#{@name_pattern})\s{2,}
                (?:(?<year>#{@year_pattern})\s+)?
                (?<school>#{@name_pattern})\s+
-               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ))\s*
+               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,
              line
            ) do
       add_swim(state, parsed)
+    else
+      nil -> parse_splits(state, line)
     end
   end
 
@@ -69,7 +71,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
                \*?(?<place>#{@place_pattern})\s+
                (?<school>#{@name_pattern})\s+
                '?(?<relay>[A-E])'?\s+
-               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ))\s*
+               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,
@@ -107,6 +109,28 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
                   fn [result | rest] ->
                     swimmers = result.swimmers ++ swimmers
                     [%Swim{result | swimmers: swimmers} | rest]
+                  end
+                )
+          }
+      }
+    end
+  end
+
+  def parse_splits(state, line) do
+    if String.match?(
+         line,
+         ~r/\A(?:\s+(?:#{@time_pattern}Q?(?:\s+\([^\)]*\))?|DQ))+\s*\z/x
+       ) do
+      %State{
+        state
+        | meet: %Meet{
+            state.meet
+            | events:
+                Map.update!(
+                  state.meet.events,
+                  state.event,
+                  fn [swim | rest] ->
+                    [Swim.add_splits(swim, line) | rest]
                   end
                 )
           }

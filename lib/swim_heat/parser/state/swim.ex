@@ -22,7 +22,7 @@ defmodule SwimHeat.Parser.State.Swim do
       case fields["points"] do
         nil -> nil
         "" -> nil
-        n -> String.to_integer(n)
+        n -> n |> String.replace(~r{\.0\z}, "") |> String.to_integer()
       end
 
     %__MODULE__{

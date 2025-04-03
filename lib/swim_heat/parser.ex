@@ -258,7 +258,12 @@ defmodule SwimHeat.Parser do
       String.match?(line, ~r{\A\s+Shoulders\b}) or
       String.match?(line, ~r{\A\s+Did\s+not\s+finish\b}) or
       String.match?(line, ~r{\A\s+Delay\s+of\s+meet\b}) or
-      String.match?(line, ~r{\A\s+Not\s+on\s+back\b})
+      String.match?(line, ~r{\A\s+Not\s+on\s+back\b}) or
+      String.match?(line, ~r{\A\s+Arms\s+underwater\s+recovery\b}) or
+      String.match?(line, ~r{\A\s+Scissors\s+kick\b}) or
+      String.match?(line, ~r{\A\s+No\s+touch\s+(?:on|at)\s+turn\b}) or
+      String.match?(line, ~r{\A\s+One\s+hand\s+touch\b}) or
+      String.match?(line, ~r{\A\s+Alternating\s+Kick\b})
   end
 
   defp new_event?(state, line) do
