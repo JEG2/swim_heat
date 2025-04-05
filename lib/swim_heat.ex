@@ -9,7 +9,7 @@ defmodule SwimHeat do
 
     {parsed, errors} =
       SwimHeat.Parser.stream_meets()
-      |> Stream.drop(13)
+      |> Stream.drop(27)
       |> Enum.take(1)
       |> Enum.split_with(fn result -> elem(result, 0) == :ok end)
 

@@ -26,9 +26,11 @@ defmodule SwimHeat.Parser do
   @event_re ~r{\A\s*#{@event_pattern}\s*}x
 
   def stream_meets do
-    Stream.map(PrivFiles.all_txts(), fn file ->
-      parse_meet(file)
+    PrivFiles.all_txts()
+    |> Stream.reject(fn file ->
+      String.ends_with?(file, "2024-11-12_union_multi_dual_meet.txt")
     end)
+    |> Stream.map(fn file -> parse_meet(file) end)
   end
 
   def parse_meet(file) do
@@ -89,7 +91,9 @@ defmodule SwimHeat.Parser do
             nil -> {:halt, {:error, "#{state.reading} not found", file, line}}
           end
         rescue
-          error -> {:halt, {:error, error, file, line}}
+          error ->
+            IO.inspect(__STACKTRACE__)
+            {:halt, {:error, error, file, line}}
         end
       end)
 
@@ -113,6 +117,8 @@ defmodule SwimHeat.Parser do
   end
 
   def parse_line(state, line) do
+    IO.inspect({state.strategy, state.reading, line})
+
     cond do
       is_binary(state.fragment) ->
         with merged when is_binary(merged) <-
@@ -129,7 +135,7 @@ defmodule SwimHeat.Parser do
       junk_line?(line) ->
         state
 
-      state.reading in ~w[meet_name_and_date strategy]a ->
+      state.reading in ~w[meet_name_and_date results]a ->
         apply(__MODULE__, :"parse_#{state.reading}", [state, line])
 
       buffering?(state) ->
@@ -186,14 +192,14 @@ defmodule SwimHeat.Parser do
            Regex.named_captures(
              ~r{
                \A\s+
-               (?<name>[^-]+?)\s+
+               (?<name>.+?)\s+
                -\s+
                (?<month>\d+)/(?<day>\d+)/(?<year>\d+)\s*
                \z
              }x,
              line
            ) do
-      %State{state | reading: :event, meet: Meet.new(parsed)}
+      %State{state | reading: :results, meet: Meet.new(parsed)}
     end
   end
 
@@ -210,9 +216,17 @@ defmodule SwimHeat.Parser do
            \z
          >x
        ) do
-      %State{state | reading: :event}
+      %State{state | reading: :results}
     else
       {:error, "non-matching date"}
+    end
+  end
+
+  def parse_results(state, line) do
+    if String.match?(line, ~r{\A\s+Results\b}) do
+      %State{state | reading: :event}
+    else
+      state
     end
   end
 
@@ -252,7 +266,6 @@ defmodule SwimHeat.Parser do
     String.match?(line, ~r{\A[\s=]*\z}) or
       String.match?(line, ~r{\AFirefox\b}) or
       String.match?(line, ~r{\A\d+\s+of\s+\d+\b}) or
-      String.match?(line, ~r{\A\s+Results\b}) or
       String.match?(line, ~r{\A\s+Early\s+take-off\b}) or
       String.match?(line, ~r{\A\s+False\s+start\b}) or
       String.match?(line, ~r{\A\s+Shoulders\b}) or

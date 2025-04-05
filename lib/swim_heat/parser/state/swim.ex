@@ -49,6 +49,7 @@ defmodule SwimHeat.Parser.State.Swim do
   end
 
   defp parse_time(nil), do: nil
+  defp parse_time(""), do: nil
 
   defp parse_time(time) do
     time =

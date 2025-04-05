@@ -15,7 +15,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
              ~r{
                \A\s*
                Name\s+
-               (?:Yr|Age)\s+
+               (?:Y(?:ea)?r|Age)\s+
                (?:School|Team)\s+
                Seed(?:\sTime)?\s+
                Finals(?:\sTime)?\s*
@@ -57,7 +57,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                \A\s*
                (?:Team|School)\s+
                (?:Relay\s+)?
-               Seed(?:\sTime)?\s+
+               (?:Seed(?:\sTime)?\s+)?
                Finals(?:\sTime)?\s*
                (?:Points)?\s*
                \z
@@ -76,7 +76,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                \*?(?<place>#{@place_pattern})\s+
                (?<school>#{@name_pattern})\s+
                '?(?<relay>[A-E])'?\s+
-               (?<seed>#{@time_pattern}|NT)\s+
+               (?<seed>#{@time_pattern}|NT)?\s*
                (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
                (?<points>#{@points_pattern})?\s*
                \z

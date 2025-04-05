@@ -15,7 +15,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
              ~r{
                \A\s*
                Name\s+
-               (?:Yr|Age)?\s*
+               (?:Y(?:ea)?r|Age)?\s*
                (?:Team|School)\s+
                Finals\sTime\s*
                \z
@@ -23,6 +23,8 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
              line
            ) do
       %State{state | reading: :individual_swim}
+    else
+      nil -> parse_individual_swim(state, line)
     end
   end
 
@@ -60,6 +62,8 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
              line
            ) do
       %State{state | reading: :relay_swim}
+    else
+      nil -> parse_relay_swim(state, line)
     end
   end
 
