@@ -38,6 +38,7 @@ defmodule SwimHeat.Parser do
       file
       |> File.stream!()
       |> Stream.map(&String.replace(&1, "Butter ly", "Butterfly"))
+      |> Stream.reject(&String.contains?(&1, "608:36:40.00"))
 
     state = choose_strategy(lines)
     process_stream(lines, file, state)
@@ -92,7 +93,7 @@ defmodule SwimHeat.Parser do
           end
         rescue
           error ->
-            IO.inspect(__STACKTRACE__)
+            # IO.inspect(__STACKTRACE__)
             {:halt, {:error, error, file, line}}
         end
       end)
@@ -117,7 +118,7 @@ defmodule SwimHeat.Parser do
   end
 
   def parse_line(state, line) do
-    IO.inspect({state.strategy, state.reading, line})
+    # IO.inspect({state.strategy, state.reading, line})
 
     cond do
       is_binary(state.fragment) ->

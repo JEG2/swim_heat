@@ -17,7 +17,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                Name\s+
                (?:Y(?:ea)?r|Age)\s+
                (?:School|Team)\s+
-               Seed(?:\sTime)?\s+
+               (?:Seed(?:\sTime)?)?\s*
                Finals(?:\sTime)?\s*
                (?:Points)?\s*
                \z
@@ -37,7 +37,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                (?<name>#{@name_pattern})\s{2,}
                (?:(?<year>#{@year_pattern})\s+)?
                (?<school>#{@name_pattern})\s+
-               (?<seed>#{@time_pattern}|NT)\s+
+               (?<seed>#{@time_pattern}|NT)?\s*
                (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
                (?<points>#{@points_pattern})?\s*
                \z
