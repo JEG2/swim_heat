@@ -7,6 +7,8 @@ defmodule SwimHeat.Parser.State.Swim do
     :seed,
     :time,
     :points,
+    :dq?,
+    :dq_reason,
     splits: [],
     swimmers: []
   ]
@@ -32,7 +34,8 @@ defmodule SwimHeat.Parser.State.Swim do
       school: fields["school"],
       seed: parse_time(fields["seed"]),
       time: parse_time(fields["time"]),
-      points: points
+      points: points,
+      dq?: fields["time"] && String.match?(fields["time"], ~r{\A(?:DQ|DNF)})
     }
   end
 

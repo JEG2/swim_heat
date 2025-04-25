@@ -1,6 +1,5 @@
 defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
   alias SwimHeat.Parser.State
-  alias SwimHeat.Parser.State.Meet
   alias SwimHeat.Parser.State.Swim
 
   @place_pattern "\\d+|-+"
@@ -43,7 +42,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
              /x,
              line
            ) do
-      add_swim(state, parsed)
+      State.add_swim(state, parsed)
     else
       nil -> parse_splits(state, line)
     end
@@ -81,7 +80,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
              /x,
              line
            ) do
-      add_swim(state, parsed)
+      State.add_swim(state, parsed)
     else
       nil -> parse_swimmers(state, line)
     end
@@ -102,21 +101,10 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
           {name} -> {name, nil}
         end)
 
-      %State{
-        state
-        | meet: %Meet{
-            state.meet
-            | events:
-                Map.update!(
-                  state.meet.events,
-                  state.event,
-                  fn [result | rest] ->
-                    swimmers = result.swimmers ++ swimmers
-                    [%Swim{result | swimmers: swimmers} | rest]
-                  end
-                )
-          }
-      }
+      State.update_swim(state, fn [result | rest] ->
+        swimmers = result.swimmers ++ swimmers
+        [%Swim{result | swimmers: swimmers} | rest]
+      end)
     end
   end
 
@@ -125,38 +113,9 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
          line,
          ~r/\A(?:\s+(?:#{@time_pattern}Q?(?:\s+\([^\)]*\))?|DQ))+\s*\z/x
        ) do
-      %State{
-        state
-        | meet: %Meet{
-            state.meet
-            | events:
-                Map.update!(
-                  state.meet.events,
-                  state.event,
-                  fn [swim | rest] ->
-                    [Swim.add_splits(swim, line) | rest]
-                  end
-                )
-          }
-      }
+      State.update_swim(state, fn [swim | rest] ->
+        [Swim.add_splits(swim, line) | rest]
+      end)
     end
-  end
-
-  defp add_swim(state, fields) do
-    swim = Swim.new(fields)
-
-    %State{
-      state
-      | meet: %Meet{
-          state.meet
-          | events:
-              Map.update(
-                state.meet.events,
-                state.event,
-                [swim],
-                &[swim | &1]
-              )
-        }
-    }
   end
 end

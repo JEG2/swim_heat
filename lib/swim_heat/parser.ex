@@ -2,6 +2,7 @@ defmodule SwimHeat.Parser do
   alias SwimHeat.Parser.State
   alias SwimHeat.Parser.State.Event
   alias SwimHeat.Parser.State.Meet
+  alias SwimHeat.Parser.State.Swim
   alias SwimHeat.Parser.Strategy.OneEventAtATime
   alias SwimHeat.Parser.Strategy.MultipleEventsInColumns
   alias SwimHeat.PrivFiles
@@ -37,11 +38,15 @@ defmodule SwimHeat.Parser do
     lines =
       file
       |> File.stream!()
-      |> Stream.map(&String.replace(&1, "Butter ly", "Butterfly"))
-      |> Stream.reject(&String.contains?(&1, "608:36:40.00"))
+      |> Stream.map(&apply_global_fixes/1)
 
     state = choose_strategy(lines)
     process_stream(lines, file, state)
+  end
+
+  def apply_global_fixes(line) do
+    line
+    |> String.replace("Butter ly", "Butterfly")
   end
 
   def choose_strategy(enum) do
@@ -127,9 +132,6 @@ defmodule SwimHeat.Parser do
           parse_line(%State{state | fragment: nil}, merged)
         end
 
-      finished?(line) and not buffering?(state) ->
-        %State{state | reading: :done}
-
       page_start?(line) ->
         %State{state | page: state.page + 1, reading: :meet_name_and_date}
 
@@ -142,11 +144,19 @@ defmodule SwimHeat.Parser do
       buffering?(state) ->
         %State{state | buffer: extract_columns(state, line)}
 
+      finished?(line) ->
+        %State{state | reading: :done}
+
       new_event?(state, line) ->
         parse_event(%State{state | reading: :event}, line)
 
       state.reading == :event ->
         parse_event(state, line)
+
+      swim_error?(state, line) ->
+        State.update_swim(state, fn [swim | rest] ->
+          [%Swim{swim | dq_reason: String.trim(line)} | rest]
+        end)
 
       not is_nil(state.strategy) ->
         case apply(state.strategy, :"parse_#{state.reading}", [state, line]) do
@@ -267,22 +277,37 @@ defmodule SwimHeat.Parser do
     String.match?(line, ~r{\A[\s=]*\z}) or
       String.match?(line, ~r{\AFirefox\b}) or
       String.match?(line, ~r{\A\d+\s+of\s+\d+\b}) or
-      String.match?(line, ~r{\A\s+Early\s+take-off\b}) or
-      String.match?(line, ~r{\A\s+False\s+start\b}) or
-      String.match?(line, ~r{\A\s+Shoulders\b}) or
-      String.match?(line, ~r{\A\s+Did\s+not\s+finish\b}) or
-      String.match?(line, ~r{\A\s+Delay\s+of\s+meet\b}) or
-      String.match?(line, ~r{\A\s+Not\s+on\s+back\b}) or
-      String.match?(line, ~r{\A\s+Arms\s+underwater\s+recovery\b}) or
-      String.match?(line, ~r{\A\s+Scissors\s+kick\b}) or
-      String.match?(line, ~r{\A\s+No\s+touch\s+(?:on|at)\s+turn\b}) or
-      String.match?(line, ~r{\A\s+One\s+hand\s+touch\b}) or
-      String.match?(line, ~r{\A\s+Alternating\s+Kick\b})
+      String.match?(line, ~r{\b608:36:40.00\b})
   end
 
   defp new_event?(state, line) do
     state.reading in ~w[individual_swim relay_swim]a and
       String.match?(line, @event_re)
+  end
+
+  defp swim_error?(state, line) do
+    line = String.trim(line)
+
+    state.reading in ~w[relay_swim individual_swim]a and
+      is_list(state.meet.events[state.event]) and
+      hd(state.meet.events[state.event]).dq? and
+      Enum.any?(
+        [
+          "Early take-off",
+          "False start",
+          "Shoulders",
+          "Did not finish",
+          "Delay of meet",
+          "Not on back",
+          "Arms underwater recovery",
+          "Scissors kick",
+          "No touch at turn",
+          "No touch on turn",
+          "One hand touch",
+          "Alternating Kick"
+        ],
+        &String.starts_with?(line, &1)
+      )
   end
 
   defp merge_lines(top, bottom) do
