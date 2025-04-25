@@ -1,5 +1,6 @@
 defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
   alias SwimHeat.Parser.State
+  alias SwimHeat.Parser.State.Event
   alias SwimHeat.Parser.State.Swim
 
   @place_pattern "\\d+|-+"
@@ -21,7 +22,11 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
              }x,
              line
            ) do
-      %State{state | reading: :individual_swim}
+      %State{
+        state
+        | event: %Event{state.event | type: :only},
+          reading: :individual_swim
+      }
     else
       nil -> parse_individual_swim(state, line)
     end
@@ -36,7 +41,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
                (?<name>#{@name_pattern})\s{2,}
                (?:(?<year>#{@year_pattern})\s+)?
                (?<school>#{@name_pattern})\s+
-               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
+               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,
@@ -60,7 +65,11 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
              }x,
              line
            ) do
-      %State{state | reading: :relay_swim}
+      %State{
+        state
+        | event: %Event{state.event | type: :only},
+          reading: :relay_swim
+      }
     else
       nil -> parse_relay_swim(state, line)
     end
@@ -74,7 +83,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
                \*?(?<place>#{@place_pattern})\s+
                (?<school>#{@name_pattern})\s+
                '?(?<relay>[A-E])'?\s+
-               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
+               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,

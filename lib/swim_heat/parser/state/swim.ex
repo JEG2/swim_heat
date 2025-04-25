@@ -9,6 +9,7 @@ defmodule SwimHeat.Parser.State.Swim do
     :points,
     :dq?,
     :dq_reason,
+    :qualified?,
     splits: [],
     swimmers: []
   ]
@@ -35,7 +36,8 @@ defmodule SwimHeat.Parser.State.Swim do
       seed: parse_time(fields["seed"]),
       time: parse_time(fields["time"]),
       points: points,
-      dq?: fields["time"] && String.match?(fields["time"], ~r{\A(?:DQ|DNF)})
+      dq?: is_nil(place),
+      qualified?: fields["qualified"] == "q"
     }
   end
 
@@ -61,7 +63,7 @@ defmodule SwimHeat.Parser.State.Swim do
       |> String.replace(~r{(\d)Q\z}, "\\1")
 
     cond do
-      String.starts_with?(time, "DQ") or time in ~w[NT NS SCR DNF] ->
+      String.starts_with?(time, "DQ") or time in ~w[NT NS SCR DNF DFS] ->
         nil
 
       String.contains?(time, ":") ->

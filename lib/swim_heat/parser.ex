@@ -10,7 +10,7 @@ defmodule SwimHeat.Parser do
   @event_pattern """
     (?:(?:(?:[AB]\\s+-\\s+Final|Preliminaries)\\s+\\.\\.\\.\\s+)?\\()?
     (?:(?:Event\\s+|\\#)(?<number>\\d+)\\s+)?
-    (?<gender>Girls|Boys|Women|Men)\\s+
+    (?<gender>Girls|Boys|Women|Men|Mixed)\\s+
     (?<distance>\\d+)\\s+
     (?:SC\\s+)?(?<unit>Yard|Meter)\\s+
     (?<stroke>
@@ -25,6 +25,7 @@ defmodule SwimHeat.Parser do
     \\)?
   """
   @event_re ~r{\A\s*#{@event_pattern}\s*}x
+  @event_type_re ~r{\A\s*(?:[ABC]\s+-\s+Final|Preliminaries)\s*\z}
 
   def stream_meets do
     PrivFiles.all_txts()
@@ -114,6 +115,11 @@ defmodule SwimHeat.Parser do
             %State{state | columns: [0..-1//1], buffer: nil, reading: :event}
           )
         else
+          if state.reading not in ~w[individual_swim relay_swim done]a do
+            IO.inspect(state)
+            raise "Unfinished parsing:  #{file}"
+          end
+
           post_process(state.meet)
         end
 
@@ -132,23 +138,35 @@ defmodule SwimHeat.Parser do
           parse_line(%State{state | fragment: nil}, merged)
         end
 
+      finished?(line) and not buffering?(state) ->
+        %State{state | reading: :done}
+
       page_start?(line) ->
         %State{state | page: state.page + 1, reading: :meet_name_and_date}
 
       junk_line?(line) ->
         state
 
-      state.reading in ~w[meet_name_and_date results]a ->
+      state.reading in ~w[meet_name_and_date results prelim_dupes]a ->
         apply(__MODULE__, :"parse_#{state.reading}", [state, line])
 
       buffering?(state) ->
         %State{state | buffer: extract_columns(state, line)}
 
-      finished?(line) ->
-        %State{state | reading: :done}
-
       new_event?(state, line) ->
         parse_event(%State{state | reading: :event}, line)
+
+      event_type?(state, line) ->
+        if String.contains?(line, "Final") and state.event.type != :final do
+          raise "Mismatched event types"
+        end
+
+        if String.contains?(line, "Preliminaries") and
+             state.event.type == :final do
+          %State{state | reading: :prelim_dupes}
+        else
+          state
+        end
 
       state.reading == :event ->
         parse_event(state, line)
@@ -203,9 +221,10 @@ defmodule SwimHeat.Parser do
            Regex.named_captures(
              ~r{
                \A\s+
-               (?<name>.+?)\s+
-               -\s+
+               (?<name>.+?)\s*
+               -\s*
                (?<month>\d+)/(?<day>\d+)/(?<year>\d+)\s*
+               (?:to\s+\d+/\d+/\d+\s*)?
                \z
              }x,
              line
@@ -229,7 +248,7 @@ defmodule SwimHeat.Parser do
        ) do
       %State{state | reading: :results}
     else
-      {:error, "non-matching date"}
+      state
     end
   end
 
@@ -239,6 +258,10 @@ defmodule SwimHeat.Parser do
     else
       state
     end
+  end
+
+  def parse_prelim_dupes(state, _line) do
+    state
   end
 
   def parse_event(state, "(" <> line) do
@@ -277,12 +300,18 @@ defmodule SwimHeat.Parser do
     String.match?(line, ~r{\A[\s=]*\z}) or
       String.match?(line, ~r{\AFirefox\b}) or
       String.match?(line, ~r{\A\d+\s+of\s+\d+\b}) or
-      String.match?(line, ~r{\b608:36:40.00\b})
+      String.match?(line, ~r{\b608:36:40.00\b}) or
+      String.match?(line, ~r{\bbrought\s+to\s+you\s+by\b})
   end
 
   defp new_event?(state, line) do
     state.reading in ~w[individual_swim relay_swim]a and
       String.match?(line, @event_re)
+  end
+
+  defp event_type?(state, line) do
+    state.reading in ~w[individual_swim relay_swim]a and
+      String.match?(line, @event_type_re)
   end
 
   defp swim_error?(state, line) do
@@ -304,7 +333,15 @@ defmodule SwimHeat.Parser do
           "No touch at turn",
           "No touch on turn",
           "One hand touch",
-          "Alternating Kick"
+          "Alternating Kick",
+          "Declared false start",
+          "Stroke Infraction",
+          "Head did not break the surface",
+          "Shoulders past vertical",
+          "Multiple strokes past vertical",
+          "Incomplete stroke cycle",
+          "Downward butterfly kick",
+          "Non-simultaneous touch"
         ],
         &String.starts_with?(line, &1)
       )

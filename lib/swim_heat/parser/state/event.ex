@@ -1,5 +1,5 @@
 defmodule SwimHeat.Parser.State.Event do
-  defstruct ~w[number gender distance unit stroke relay]a
+  defstruct ~w[number gender distance unit stroke relay type]a
 
   def new(fields) do
     number =
@@ -14,6 +14,7 @@ defmodule SwimHeat.Parser.State.Event do
         "Women" -> :girls
         "Boys" -> :boys
         "Men" -> :boys
+        "Mixed" -> :mixed
       end
 
     unit =

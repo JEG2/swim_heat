@@ -1,5 +1,6 @@
 defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
   alias SwimHeat.Parser.State
+  alias SwimHeat.Parser.State.Event
   alias SwimHeat.Parser.State.Swim
 
   @place_pattern "\\d+|-+"
@@ -16,14 +17,25 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                Name\s+
                (?:Y(?:ea)?r|Age)\s+
                (?:School|Team)\s+
-               (?:Seed(?:\sTime)?)?\s*
-               Finals(?:\sTime)?\s*
+               (?:(?<seed>Seed|Prelim)(?:\sTime)?)?\s*
+               (?<type>Finals|Prelim)(?:\sTime)?\s*
                (?:Points)?\s*
                \z
              }x,
              line
            ) do
-      %State{state | reading: :individual_swim}
+      type =
+        cond do
+          parsed["type"] == "Prelim" -> :prelim
+          parsed["seed"] == "Prelim" and parsed["type"] == "Finals" -> :final
+          true -> :only
+        end
+
+      %State{
+        state
+        | event: %Event{state.event | type: type},
+          reading: :individual_swim
+      }
     end
   end
 
@@ -37,8 +49,9 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                (?:(?<year>#{@year_pattern})\s+)?
                (?<school>#{@name_pattern})\s+
                (?<seed>#{@time_pattern}|NT)?\s*
-               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
+               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
+               (?<qualified>q)?\s*
                \z
              /x,
              line
@@ -56,14 +69,25 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                \A\s*
                (?:Team|School)\s+
                (?:Relay\s+)?
-               (?:Seed(?:\sTime)?\s+)?
-               Finals(?:\sTime)?\s*
+               (?:(?<seed>Seed)(?:\sTime)?\s+)?
+               (?<type>Finals)(?:\sTime)?\s*
                (?:Points)?\s*
                \z
              }x,
              line
            ) do
-      %State{state | reading: :relay_swim}
+      type =
+        cond do
+          parsed["type"] == "Prelim" -> :prelim
+          parsed["seed"] == "Prelim" and parsed["type"] == "Finals" -> :final
+          true -> :only
+        end
+
+      %State{
+        state
+        | event: %Event{state.event | type: type},
+          reading: :relay_swim
+      }
     end
   end
 
@@ -76,8 +100,9 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                (?<school>#{@name_pattern})\s+
                '?(?<relay>[A-E])'?\s+
                (?<seed>#{@time_pattern}|NT)?\s*
-               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF))\s*
+               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
+               (?<qualified>q)?\s*
                \z
              /x,
              line

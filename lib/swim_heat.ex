@@ -9,13 +9,14 @@ defmodule SwimHeat do
 
     {parsed, errors} =
       SwimHeat.Parser.stream_meets()
-      # |> Stream.drop(27)
+      # |> Stream.drop(35)
       # |> Enum.take(1)
       |> Enum.split_with(fn result -> elem(result, 0) == :ok end)
 
-    # parsed |> Enum.at(2) |> IO.inspect()
+    # parsed |> Enum.at(0) |> IO.inspect()
     parsed_count = length(parsed)
     IO.puts("Parsed #{parsed_count} of #{parsed_count + length(errors)}.")
-    List.first(errors)
+    # List.first(errors)
+    errors
   end
 end
