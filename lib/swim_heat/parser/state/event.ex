@@ -1,5 +1,14 @@
 defmodule SwimHeat.Parser.State.Event do
-  defstruct ~w[number gender distance unit stroke relay type]a
+  defstruct [
+    :number,
+    :gender,
+    :distance,
+    :unit,
+    :stroke,
+    :relay,
+    :type,
+    records: %{}
+  ]
 
   def new(fields) do
     number =

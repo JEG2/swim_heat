@@ -6,7 +6,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
   @place_pattern "\\d+|-+"
   @name_pattern "\\S.*?"
   @year_pattern "FR|SO|JR|SR"
-  @time_pattern "(?:\\d+:)?\\d+\\.\\d+"
+  @time_pattern "(?:\\d+:)?\\d+\\.\\d+[^\\d\\s]?"
   @points_pattern "\\d+(?:\\.0)?"
 
   def parse_individual_headers(state, line) do

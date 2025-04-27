@@ -60,7 +60,7 @@ defmodule SwimHeat.Parser.State.Swim do
     time =
       time
       |> String.replace(~r{\A[xX]}, "")
-      |> String.replace(~r{(\d)Q\z}, "\\1")
+      |> String.replace(~r{(\d)[^\d\s]\z}, "\\1")
 
     cond do
       String.starts_with?(time, "DQ") or time in ~w[NT NS SCR DNF DFS] ->

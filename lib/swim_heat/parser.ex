@@ -29,25 +29,56 @@ defmodule SwimHeat.Parser do
 
   def stream_meets do
     PrivFiles.all_txts()
-    |> Stream.reject(fn file ->
-      String.ends_with?(file, "2024-11-12_union_multi_dual_meet.txt")
-    end)
+    |> Stream.reject(&skipped_file?/1)
     |> Stream.map(fn file -> parse_meet(file) end)
+  end
+
+  def skipped_file?(file) do
+    String.ends_with?(file, "2024-11-12_union_multi_dual_meet.txt")
   end
 
   def parse_meet(file) do
     lines =
       file
       |> File.stream!()
-      |> Stream.map(&apply_global_fixes/1)
+      |> Stream.map(&apply_fixes/1)
 
     state = choose_strategy(lines)
     process_stream(lines, file, state)
   end
 
-  def apply_global_fixes(line) do
+  def apply_fixes(line) do
     line
     |> String.replace("Butter ly", "Butterfly")
+    |> String.replace("Butte2/17/2018", "Butterfly")
+    |> String.replace(
+      ~r{
+\A(\s+1\s+Cermak,\s+Lucy\s+O\s+FR\s+)
+      (\s+1:00.14\s+1:00.20\s+20\s*)\z
+      }x,
+      "\\1    \\2"
+    )
+    |> String.replace(
+      ~r{
+\A(\s+8\s+Schott,\s+Holden\s+A\s+JR\s+)
+      (\s+1:11.57\s+1:16.15\s+11\s*)\z
+      }x,
+      "\\1    \\2"
+    )
+    |> String.replace(
+      ~r{
+\A(\s+---\s+Peaster,\s+Natalie\s+FR\s+)
+      (\s+1:54.58\s+DQ\s+1:56.34\s*)\z
+      }x,
+      "\\1    \\2"
+    )
+    |> String.replace(
+      ~r{
+\A(\s+2\s+Warden,\s+Marcus\s+S\s+SO\s+)
+      (\s+1:16.53\s+1:16.54\s+17\s*)\z
+      }x,
+      "\\1    \\2"
+    )
   end
 
   def choose_strategy(enum) do
@@ -99,7 +130,7 @@ defmodule SwimHeat.Parser do
           end
         rescue
           error ->
-            # IO.inspect(__STACKTRACE__)
+            IO.inspect(__STACKTRACE__)
             {:halt, {:error, error, file, line}}
         end
       end)
@@ -365,8 +396,11 @@ defmodule SwimHeat.Parser do
       end)
 
     case result do
-      chars when is_list(chars) -> chars |> Enum.reverse() |> Enum.join()
-      error -> error
+      chars when is_list(chars) ->
+        "#{chars |> Enum.reverse() |> Enum.join()}\n"
+
+      error ->
+        error
     end
   end
 

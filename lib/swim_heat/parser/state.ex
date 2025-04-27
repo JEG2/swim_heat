@@ -7,6 +7,7 @@ defmodule SwimHeat.Parser.State do
             strategy: nil,
             meet: nil,
             event: nil,
+            record_classification: nil,
             columns: nil,
             buffer: %{},
             fragment: nil
