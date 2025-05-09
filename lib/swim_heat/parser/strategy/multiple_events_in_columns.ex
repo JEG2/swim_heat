@@ -5,9 +5,9 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
 
   @place_pattern "\\d+|-+"
   @name_pattern "\\S.*?"
-  @year_pattern "FR|SO|JR|SR"
+  @year_pattern "FR|SO|JR|SR|\\d{2}"
   @time_pattern "(?:\\d+:)?\\d+\\.\\d+[^\\d\\s]?"
-  @points_pattern "\\d+(?:\\.0)?"
+  @points_pattern "\\d+(?:\\.\\d+)?"
 
   def parse_individual_headers(state, line) do
     with parsed when is_map(parsed) <-
@@ -41,7 +41,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
                (?<name>#{@name_pattern})\s{2,}
                (?:(?<year>#{@year_pattern})\s+)?
                (?<school>#{@name_pattern})\s+
-               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
+               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,
@@ -83,7 +83,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
                \*?(?<place>#{@place_pattern})\s+
                (?<school>#{@name_pattern})\s+
                '?(?<relay>[A-E])'?\s+
-               (?<time>[xX]?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
+               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,

@@ -52,32 +52,44 @@ defmodule SwimHeat.Parser do
     |> String.replace("Butter ly", "Butterfly")
     |> String.replace("Butte2/17/2018", "Butterfly")
     |> String.replace(
+      ~r{(Bishop\sKelley\sHigh\sSchool\sSwim-O)(\d)},
+      "\\1K    \\2"
+    )
+    |> String.replace(
+      ~r{(Muskogee\sHigh\sSchool\sSwim\sTeam)(\d)},
+      "\\1    \\2"
+    )
+    |> String.replace(
       ~r{
-\A(\s+1\s+Cermak,\s+Lucy\s+O\s+FR\s+)
-      (\s+1:00.14\s+1:00.20\s+20\s*)\z
+        \A(\s+1\s+Cermak,\s+Lucy\s+O\s+FR\s+)
+        (\s+1:00.14\s+1:00.20\s+20\s*)\z
       }x,
       "\\1    \\2"
     )
     |> String.replace(
       ~r{
-\A(\s+8\s+Schott,\s+Holden\s+A\s+JR\s+)
-      (\s+1:11.57\s+1:16.15\s+11\s*)\z
+        \A(\s+8\s+Schott,\s+Holden\s+A\s+JR\s+)
+        (\s+1:11.57\s+1:16.15\s+11\s*)\z
       }x,
       "\\1    \\2"
     )
     |> String.replace(
       ~r{
-\A(\s+---\s+Peaster,\s+Natalie\s+FR\s+)
-      (\s+1:54.58\s+DQ\s+1:56.34\s*)\z
+        \A(\s+---\s+Peaster,\s+Natalie\s+FR\s+)
+        (\s+1:54.58\s+DQ\s+1:56.34\s*)\z
       }x,
       "\\1    \\2"
     )
     |> String.replace(
       ~r{
-\A(\s+2\s+Warden,\s+Marcus\s+S\s+SO\s+)
-      (\s+1:16.53\s+1:16.54\s+17\s*)\z
+        \A(\s+2\s+Warden,\s+Marcus\s+S\s+SO\s+)
+        (\s+1:16.53\s+1:16.54\s+17\s*)\z
       }x,
       "\\1    \\2"
+    )
+    |> String.replace(
+      ~r{(De\sLa\sTorre\sJimenez,\sVioleta\s)(15\sENID-OK)},
+      "\\1 \\2"
     )
   end
 
@@ -166,7 +178,7 @@ defmodule SwimHeat.Parser do
       is_binary(state.fragment) ->
         with merged when is_binary(merged) <-
                merge_lines(state.fragment, line) do
-          parse_line(%State{state | fragment: nil}, merged)
+          parse_line(%State{state | fragment: nil}, apply_fixes(merged))
         end
 
       finished?(line) and not buffering?(state) ->

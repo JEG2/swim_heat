@@ -8,7 +8,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
   @name_pattern "\\S.*?"
   @year_pattern "FR|SO|JR|SR|\\d+"
   @time_pattern "(?:\\d+:)?\\d+\\.\\d+[^\\d\\s]?"
-  @points_pattern "\\d+"
+  @points_pattern "\\d+(?:\\.\\d+)?"
 
   def parse_individual_headers(state, line) do
     with parsed when is_map(parsed) <-

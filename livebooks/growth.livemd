@@ -1,0 +1,52 @@
+# Swimmer Growth
+
+```elixir
+Mix.install(
+  [
+    {:swim_heat, path: Path.join(__DIR__, ".."), env: :dev},
+    {:kino_vega_lite, "~> 0.1.13"}
+  ],
+  lockfile: :swim_heat
+)
+```
+
+## Individual
+
+```elixir
+data =
+  ".."
+  |> Path.expand(__DIR__)
+  |> File.cd!(fn ->
+    "Edmond North"
+    |> SwimHeat.Database.list_swimmers()
+    |> Enum.map(fn swimmer ->
+      SwimHeat.Database.list_swims("Edmond North", swimmer)
+    end)
+  end)
+```
+
+```elixir
+Enum.each(data, fn {swimmer, swims} ->
+  swims
+  |> Enum.reject(& &1.event.relay?)
+  |> Enum.group_by(fn swim ->
+    "#{swimmer.name} - #{swim.event.distance} #{swim.event.unit} #{swim.event.stroke}"
+  end)
+  |> Enum.map(fn {se, swims} -> {se, Enum.reject(swims, & &1.swim.dq?)} end)
+  |> Enum.reject(fn {_se, swims} -> length(swims) < 2 end)
+  |> Enum.map(fn {se, swims} ->
+    results =
+      swims
+      |> Enum.with_index()
+      |> Enum.map(fn {swim, i} -> %{time: swim.swim.time, i: i} end)
+    {min, max} = results |> Enum.map(fn s -> s.time end) |> Enum.min_max
+
+    VegaLite.new(title: se)
+    |> VegaLite.data_from_values(results, only: ["i", "time"])
+    |> VegaLite.mark(:line)
+    |> VegaLite.encode_field(:x, "i", type: :quantitative)
+    |> VegaLite.encode_field(:y, "time", type: :quantitative, scale: [domain: [floor(min), ceil(max)]])
+    |> Kino.render()
+  end)
+end)
+```

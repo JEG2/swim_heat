@@ -1,4 +1,7 @@
 defmodule SwimHeat.Parser.State.Event do
+  alias SwimHeat.Database
+  require Database
+
   defstruct [
     :number,
     :gender,
@@ -54,5 +57,38 @@ defmodule SwimHeat.Parser.State.Event do
       stroke: stroke,
       relay: fields["relay"] == "Relay"
     }
+  end
+
+  def to_record(event) do
+    id =
+      ~w[number gender distance unit stroke]a
+      |> Enum.map_join(" ", fn f -> Map.fetch!(event, f) end)
+      |> String.trim()
+
+    id =
+      if event.relay do
+        "#{id} Relay"
+      else
+        id
+      end
+
+    id =
+      if event.type == :prelim do
+        "#{id} Prelim"
+      else
+        id
+      end
+
+    Database.event(
+      id: id,
+      number: event.number,
+      gender: event.gender,
+      distance: event.distance,
+      unit: event.unit,
+      stroke: event.stroke,
+      relay?: event.relay,
+      prelim?: event.type == :prelim,
+      records: event.records
+    )
   end
 end
