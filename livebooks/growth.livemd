@@ -36,17 +36,124 @@ Enum.each(data, fn {swimmer, swims} ->
   |> Enum.reject(fn {_se, swims} -> length(swims) < 2 end)
   |> Enum.map(fn {se, swims} ->
     results =
-      swims
-      |> Enum.with_index()
-      |> Enum.map(fn {swim, i} -> %{time: swim.swim.time, i: i} end)
-    {min, max} = results |> Enum.map(fn s -> s.time end) |> Enum.min_max
+      Enum.map(swims, fn s ->
+        %{
+          swim:
+            "#{Date.to_iso8601(s.meet.start_date)}#{if not s.event.prelim?, do: " Final"}",
+          time: s.swim.time
+        }
+      end)
+
+    {min, max} = results |> Enum.map(fn s -> s.time end) |> Enum.min_max()
 
     VegaLite.new(title: se)
-    |> VegaLite.data_from_values(results, only: ["i", "time"])
+    |> VegaLite.data_from_values(results)
     |> VegaLite.mark(:line)
-    |> VegaLite.encode_field(:x, "i", type: :quantitative)
-    |> VegaLite.encode_field(:y, "time", type: :quantitative, scale: [domain: [floor(min), ceil(max)]])
+    |> VegaLite.encode_field(:x, "swim", type: :nominal, title: "Event")
+    |> VegaLite.encode_field(:y, "time",
+      type: :quantitative,
+      scale: [domain: [floor(min), ceil(max)]],
+      title: "Seconds"
+    )
     |> Kino.render()
   end)
+end)
+```
+
+## IMs
+
+```elixir
+data
+|> Enum.map(fn {swimmer, swims} ->
+  {
+    swimmer,
+    Enum.filter(swims, fn s ->
+      s.event.stroke == :im and length(s.swim.splits) == 4 and not s.swim.dq?
+    end)
+  }
+end)
+|> Enum.reject(fn {_swimmer, swims} -> swims == [] end)
+|> Enum.each(fn {swimmer, ims} ->
+  results =
+    ims
+    |> Enum.flat_map(fn s ->
+      splits =
+        if s.swim.time == Enum.at(s.swim.splits, -1) do
+          [0 | s.swim.splits]
+          |> Enum.chunk_every(2, 1, :discard)
+          |> Enum.map(fn [prev, curr] -> curr - prev end)
+        else
+          s.swim.splits
+        end
+
+      splits
+      |> Enum.zip(~w[fly back breast free])
+      |> Enum.with_index()
+      |> Enum.map(fn {{time, stroke}, i} ->
+        %{
+          swim:
+            "#{Date.to_iso8601(s.meet.start_date)}#{if not s.event.prelim?, do: " Final"}",
+          time: time,
+          stroke: stroke,
+          stroke_order: i
+        }
+      end)
+    end)
+
+  VegaLite.new(title: swimmer.name)
+  |> VegaLite.data_from_values(results)
+  |> VegaLite.mark(:bar)
+  |> VegaLite.encode_field(:x, "time", aggregate: :sum, type: :quantitative, title: "Seconds")
+  |> VegaLite.encode_field(:y, "swim", type: :nominal, title: "Event")
+  |> VegaLite.encode_field(:color, "stroke")
+  |> VegaLite.encode_field(:order, "stroke_order")
+  |> Kino.render()
+end)
+```
+
+## Team
+
+```elixir
+data
+|> Enum.flat_map(fn {swimmer, swims} ->
+  Enum.map(swims, fn s -> Map.put(s, :swimmer, swimmer) end)
+end)
+|> Enum.reject(fn s -> s.event.relay? || s.swim.dq? end)
+|> Enum.group_by(fn swim ->
+  "#{swim.event.gender} #{swim.event.distance} #{swim.event.unit} #{swim.event.stroke}"
+end)
+|> Enum.each(fn {event, swims} ->
+  results =
+    Enum.map(swims, fn s ->
+      %{
+        swim: "#{Date.to_iso8601(s.meet.start_date)}#{if not s.event.prelim?, do: " Final"}",
+        time: s.swim.time,
+        swimmer: s.swimmer.name
+      }
+    end)
+
+  singles =
+    results
+    |> Enum.frequencies_by(& &1.swimmer)
+    |> Enum.filter(fn {_swimmer, count} -> count < 2 end)
+    |> Enum.map(fn {swimmer, _count} -> swimmer end)
+
+  results = Enum.reject(results, fn s -> s.swimmer in singles end)
+
+  if results != [] do
+    {min, max} = results |> Enum.map(fn s -> s.time end) |> Enum.min_max()
+
+    VegaLite.new(title: event)
+    |> VegaLite.data_from_values(results)
+    |> VegaLite.mark(:line)
+    |> VegaLite.encode_field(:x, "swim", type: :nominal, title: "Event")
+    |> VegaLite.encode_field(:y, "time",
+      type: :quantitative,
+      scale: [domain: [floor(min), ceil(max)]],
+      title: "Seconds"
+    )
+    |> VegaLite.encode_field(:color, "swimmer", scale: %{scheme: "category20"})
+    |> Kino.render()
+  end
 end)
 ```
