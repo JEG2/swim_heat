@@ -8,8 +8,18 @@ defmodule SwimHeat.Parser do
   alias SwimHeat.PrivFiles
 
   @event_pattern """
-    (?:(?:(?:[AB]\\s+-\\s+Final|Preliminaries)\\s+\\.\\.\\.\\s+)?\\()?
-    (?:(?:Event\\s+|\\#)(?<number>\\d+)\\s+)?
+    (?:
+      (?:
+        (?:[AB]\\s+-\\s+Final|Preliminaries)
+        \\s+\\.\\.\\.\\s+
+      )?
+      \\(
+    )?
+    (?:
+      (?:Event\\s+|\\#)
+      (?<number>\\d+)
+      (?<swim_off_short>S)?\\s+
+    )?
     (?<gender>Girls|Boys|Women|Men|Mixed)\\s+
     (?<distance>\\d+)\\s+
     (?:SC\\s+)?(?<unit>Yard|Meter)\\s+
@@ -21,11 +31,12 @@ defmodule SwimHeat.Parser do
       IM|
       Medley
     )\\s*
-    (?<relay>Relay)?
+    (?<relay>Relay)?\\s*
+    (?<swim_off_long>Swim-off)?
     \\)?
   """
   @event_re ~r{\A\s*#{@event_pattern}\s*}x
-  @event_type_re ~r{\A\s*(?:[ABC]\s+-\s+Final|Preliminaries)\s*\z}
+  @event_type_re ~r{\A\s*(?:[ABC]\s+-\s+Final|Preliminaries|-\s+Swim-off)\s*\z}
 
   def stream_meets do
     PrivFiles.all_txts()
@@ -204,6 +215,11 @@ defmodule SwimHeat.Parser do
           raise "Mismatched event types"
         end
 
+        if String.contains?(line, "Swim-off") and
+             state.event.type != :swim_off do
+          raise "Mismatched event types"
+        end
+
         if String.contains?(line, "Preliminaries") and
              state.event.type == :final do
           %State{state | reading: :prelim_dupes}
@@ -286,6 +302,7 @@ defmodule SwimHeat.Parser do
            #{Regex.escape(name)}\s+
            -\s+
            #{date.month}/#{date.day}/#{date.year}\s*
+           (?:to\s+\d+/\d+/\d+\s*)?
            \z
          >x
        ) do
@@ -311,9 +328,12 @@ defmodule SwimHeat.Parser do
     with parsed when is_map(parsed) <- Regex.named_captures(@event_re, line),
          event when is_struct(event, Event) <- Event.new(parsed),
          true <-
-           Enum.all?(~w[number gender distance unit stroke relay]a, fn key ->
-             Map.fetch!(state.event, key) == Map.fetch!(event, key)
-           end) do
+           Enum.all?(
+             ~w[number gender distance unit stroke relay]a,
+             fn key ->
+               Map.fetch!(state.event, key) == Map.fetch!(event, key)
+             end
+           ) do
       %State{state | reading: event_headers(event)}
     else
       _non_match -> nil
@@ -384,7 +404,8 @@ defmodule SwimHeat.Parser do
           "Multiple strokes past vertical",
           "Incomplete stroke cycle",
           "Downward butterfly kick",
-          "Non-simultaneous touch"
+          "Non-simultaneous touch",
+          "Changed order"
         ],
         &String.starts_with?(line, &1)
       )

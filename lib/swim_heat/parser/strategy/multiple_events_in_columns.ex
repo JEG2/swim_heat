@@ -41,7 +41,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
                (?<name>#{@name_pattern})\s{2,}
                (?:(?<year>#{@year_pattern})\s+)?
                (?<school>#{@name_pattern})\s+
-               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
+               (?<time>(?:[xXJ]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,
@@ -83,7 +83,7 @@ defmodule SwimHeat.Parser.Strategy.MultipleEventsInColumns do
                \*?(?<place>#{@place_pattern})\s+
                (?<school>#{@name_pattern})\s+
                '?(?<relay>[A-E])'?\s+
-               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
+               (?<time>(?:[xXJ]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
                \z
              /x,

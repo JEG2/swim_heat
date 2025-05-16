@@ -37,9 +37,15 @@ Enum.each(data, fn {swimmer, swims} ->
   |> Enum.map(fn {se, swims} ->
     results =
       Enum.map(swims, fn s ->
+        suffix =
+          case s.event.type do
+            :prelim -> "0:Prelim"
+            :swim_off -> "2:Swim-off"
+            _final -> "1:Final"
+          end
+        
         %{
-          swim:
-            "#{Date.to_iso8601(s.meet.start_date)}#{if not s.event.prelim?, do: " Final"}",
+          swim: "#{Date.to_iso8601(s.meet.start_date)} #{suffix}",
           time: s.swim.time
         }
       end)
@@ -90,9 +96,15 @@ end)
       |> Enum.zip(~w[fly back breast free])
       |> Enum.with_index()
       |> Enum.map(fn {{time, stroke}, i} ->
+        suffix =
+          case s.event.type do
+            :prelim -> "0:Prelim"
+            :swim_off -> "2:Swim-off"
+            _final -> "1:Final"
+          end
+
         %{
-          swim:
-            "#{Date.to_iso8601(s.meet.start_date)}#{if not s.event.prelim?, do: " Final"}",
+          swim: "#{Date.to_iso8601(s.meet.start_date)} #{suffix}",
           time: time,
           stroke: stroke,
           stroke_order: i
@@ -125,8 +137,15 @@ end)
 |> Enum.each(fn {event, swims} ->
   results =
     Enum.map(swims, fn s ->
+      suffix =
+        case s.event.type do
+          :prelim -> "0:Prelim"
+          :swim_off -> "2:Swim-off"
+          _final -> "1:Final"
+        end
+
       %{
-        swim: "#{Date.to_iso8601(s.meet.start_date)}#{if not s.event.prelim?, do: " Final"}",
+        swim: "#{Date.to_iso8601(s.meet.start_date)} #{suffix}",
         time: s.swim.time,
         swimmer: s.swimmer.name
       }

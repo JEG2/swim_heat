@@ -49,17 +49,30 @@ defmodule SwimHeat.Parser.State.Event do
         "Medley" -> :medley
       end
 
+    type =
+      if fields["swim_off_short"] == "S" or
+           fields["swim_off_long"] == "Swim-off" do
+        :swim_off
+      else
+        nil
+      end
+
     %__MODULE__{
       number: number,
       gender: gender,
       distance: String.to_integer(fields["distance"]),
       unit: unit,
       stroke: stroke,
-      relay: fields["relay"] == "Relay"
+      relay: fields["relay"] == "Relay",
+      type: type
     }
   end
 
   def to_record(event) do
+    if is_nil(event.type) do
+      raise "Unset event type"
+    end
+
     id =
       ~w[number gender distance unit stroke]a
       |> Enum.map_join(" ", fn f -> Map.fetch!(event, f) end)
@@ -72,22 +85,15 @@ defmodule SwimHeat.Parser.State.Event do
         id
       end
 
-    id =
-      if event.type == :prelim do
-        "#{id} Prelim"
-      else
-        id
-      end
-
     Database.event(
-      id: id,
+      id: "#{id} #{event.type}",
       number: event.number,
       gender: event.gender,
       distance: event.distance,
       unit: event.unit,
       stroke: event.stroke,
       relay?: event.relay,
-      prelim?: event.type == :prelim,
+      type: event.type,
       records: event.records
     )
   end

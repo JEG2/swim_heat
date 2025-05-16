@@ -95,7 +95,7 @@ defmodule SwimHeat.Parser.State.Swim do
   defp parse_time(time) do
     time =
       time
-      |> String.replace(~r{\A[xX]}, "")
+      |> String.replace(~r{\A[xXJ]}, "")
       |> String.replace(~r{(\d)[^\d\s]\z}, "\\1")
 
     cond do

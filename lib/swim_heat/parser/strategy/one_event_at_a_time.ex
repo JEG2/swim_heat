@@ -27,6 +27,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
            ) do
       type =
         cond do
+          state.event.type == :swim_off -> :swim_off
           parsed["type"] == "Prelim" -> :prelim
           parsed["seed"] == "Prelim" and parsed["type"] == "Finals" -> :final
           true -> :only
@@ -54,7 +55,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                (?:(?<year>#{@year_pattern})\s+)?
                (?<school>#{@name_pattern})\s+
                (?<seed>#{@time_pattern}|NT)?\s*
-               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
+               (?<time>(?:[xXJ]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
                (?<qualified>q)?\s*
                \z
@@ -83,6 +84,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
            ) do
       type =
         cond do
+          state.event.type == :swim_off -> :swim_off
           parsed["type"] == "Prelim" -> :prelim
           parsed["seed"] == "Prelim" and parsed["type"] == "Finals" -> :final
           true -> :only
@@ -109,7 +111,7 @@ defmodule SwimHeat.Parser.Strategy.OneEventAtATime do
                (?<school>#{@name_pattern})\s+
                '?(?<relay>[A-E])'?\s+
                (?<seed>#{@time_pattern}|NT)?\s*
-               (?<time>(?:[xX]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
+               (?<time>(?:[xXJ]|DQ\s+)?(?:#{@time_pattern}|NS|DQ|SCR|DNF|DFS))\s*
                (?<points>#{@points_pattern})?\s*
                (?<qualified>q)?\s*
                \z

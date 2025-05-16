@@ -13,7 +13,7 @@ defmodule SwimHeat.Database do
     unit: nil,
     stroke: nil,
     relay?: false,
-    prelim?: false,
+    type: nil,
     records: %{}
   )
 
@@ -103,7 +103,7 @@ defmodule SwimHeat.Database do
               unit: event(e, :unit),
               stroke: event(e, :stroke),
               relay?: event(e, :relay?),
-              prelim?: event(e, :prelim?),
+              type: event(e, :type),
               records: event(e, :records)
             },
             swim: %{
